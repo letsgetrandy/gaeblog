@@ -1,0 +1,27 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Categories{% endblock %}
+{% block headline %}Categories{% endblock %}
+
+{% block body %}
+<style>
+ul.listing a { text-decoration:none; font-size:90%; }
+ul.listing a:hover { text-decoration:underline; }
+ul.listing .name { font-weight:bold; font-size:110%; }
+</style>
+
+<form>
+    <label>Name:</label> <input type="text" name="name">
+    <label>Slug:</label> <input type="text" name="slug">
+    <button type="submit">Add</button>
+</form>
+
+<ul class="listing">
+{% for slug,name in categories %}
+<li><span class="name" data-slug="{{ slug }}">{{ name }}</span>
+    - <a href="#">[edit]</a> <a href="#">[delete]</a>
+    <!--<a href="#">[convert to tag]</a>--></li>
+{% endfor %}
+</ul>
+
+{% endblock %}

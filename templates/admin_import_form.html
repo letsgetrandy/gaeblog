@@ -1,0 +1,45 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Import from Wordpress{% endblock %}
+{% block headline %}Import from Wordpress{% endblock %}
+
+{% block styles %}
+<style>
+    label { display:block; font-weight:bold; margin-top:2em; }
+    button[type=submit] { padding:4px 9px; font-size:1em; }
+    input[type=text] { width:300px; }
+    .eg { font-size:.9em; color:#666; }
+</style>
+{% endblock %}
+
+{% block body %}
+<form method="post" enctype="multipart/form-data">
+    <label>Choose Wordpress file to import</label>
+    <input type="file" name="wpfile">
+    <br>
+    
+    <label>Site exported from:</label>
+    <input type="text" name="origurl" placeholder="http://www.yourwebsite.com/">
+    <br>
+
+    <label>Replace image paths?</label>
+    <input type="radio" name="imgpath" value="wp-content/uploads/\d+/\d+/">
+    <span class="eg">http://www.yourwebsite.com/wp-content/uploads/2009/05/someimage.jpg</span><br>
+    <input type="radio" name="imgpath" value="wp-content/uploads/">
+    <span class="eg">http://www.yourwebsite.com/wp-content/uploads/someimage.jpg</span><br>
+    <input type="radio" name="imgpath" value="" checked="true"> Do not replace image paths<br>
+
+    <label>Replace hyperlinks?</label>
+    <input type="radio" name="linkpath" value="\d+/\d+/">
+    <span class="eg">http://www.yourwebsite.com/2009/05/slug-to-your-post</span><br>
+    <input type="radio" name="linkpath" value="\d+/">
+    <span class="eg">http://www.yourwebsite.com/2009/slug-to-your-post</span><br>
+    <input type="radio" name="linkpath" value="/">
+    <span class="eg">http://www.yourwebsite.com/slug-to-your-post</span><br>
+    <input type="radio" name="linkpath" value="" checked="true"> Do not replace hyperlinks<br>
+
+    <br>
+    <br>
+    <button type="submit">Import</button>
+</form>
+{% endblock %}

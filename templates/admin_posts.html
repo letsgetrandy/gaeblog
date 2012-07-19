@@ -1,0 +1,18 @@
+{% extends "admin_base.html" %}
+
+{% block title %}{% firstof title "Posts" %}{% endblock %}
+{% block headline %}{% firstof title "Posts" %}{% endblock %}
+
+{% block body %}
+<style>
+ul.listing a { text-decoration:none; }
+ul.listing a:hover { text-decoration:underline; }
+</style>
+
+<ul class="listing">
+    {% for p in posts %}
+    <li><a href="/admin/posts/edit/{{ p.key.name }}/">{{ p.title }}</a></li>
+    {% endfor %}
+</ul>
+
+{% endblock %}

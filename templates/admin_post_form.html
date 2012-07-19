@@ -1,0 +1,260 @@
+{% extends "admin_base.html" %}
+
+{% block title %}{% firstof title "Edit Post" %}{% endblock %}
+{% block headline %}{% firstof title "Edit Post" %}{% endblock %}
+
+{% block styles %}
+<style type="text/css">
+div.pad { position:relative; margin:10px; }
+#main label { display:block; font-weight:bold; }
+label { margin-top:1em; }
+.post_meta {
+    margin-left:50px;
+    width:200px;
+}
+#id_title,
+#id_body,
+#id_excerpt { width:100%; }
+
+#post_form button[type=submit] {
+    font:1em Verdana,Arial,sans-serif;
+    padding:5px 10px;
+}
+
+/* main body */
+#findreplace_button {
+    float:right;
+    font-size:.8em;
+}
+#findreplace_wrapper {
+    background:#eee;
+    border:1px solid #555;
+    font-size:.8em;
+    margin:1em 3em;
+    padding:1em;
+}
+#findreplace_wrapper button {
+    font:.8em Verdana,Arial,sans-serif;
+    padding:2px 5px;
+}
+#excerpt_button {
+    font-size:.8em;
+}
+#tags { margin:10px 0; }
+span.tag {
+    background:#eee;
+    border:1px solid #888;
+    -webkit-border-radius:4px;
+    -moz-border-radius:4px;
+    border-radius:4px;
+    color:#666;
+    font-size:.9em;
+    margin:2px;
+    padding:2px;
+}
+span.tag:hover {
+    color:#c00;
+    cursor:pointer;
+    text-decoration:line-through;
+}
+span.slug {
+    color:#888;
+    font-weight:200;
+}
+#id_tags { width: 100%; }
+.tags { font-size:13px; }
+#id_title {
+    padding:5px;
+    font-size:1.1em;
+}
+
+/* right rail */
+#savebutton {
+    margin:1em 0;
+}
+#pubdate {
+    margin:1em 0;
+}
+#moddate {
+    color:#555;
+    font-size:.8em;
+    margin:1em 0;
+}
+ul.checklist,
+ul.checklist li {
+    list-style:none;
+    margin:0;
+    padding:0;
+}
+#delete_wrapper {
+    background:#ddd;
+    border:1px solid #888;
+    -webkit-border-radius:5px;
+    -moz-border-radius:5px;
+    border-radius:5px;
+    color:#666;
+    font-size:.8em;
+    margin-top:3em;
+    padding:10px;
+    text-align:center;
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<form id="post_form" method="post">
+<div class="split flip">
+    <div class="post_meta">
+        <div class="pad">
+            <label for="id_published">Published?</label>
+            <br>
+            <select name="published" id="id_published">
+                <option value="false">NO</option>
+                <option value="true" {% if post.published %}selected="selected"{% endif %}>YES</option>
+            </select>
+            <div id="pubdate" {% if not post.published %}style="display:none;"{% endif %}>
+                <label for="id_published_date">Publish Date:</label>
+                <input type="text" name="published_date" id="id_published_date" 
+                value="{% if post.published %}{{ post.published_date|date:'Y-m-d H:i:s' }}{% else %}{% now "Y-m-d H:i:s" %}{% endif %}">
+            </div>
+            <div id="savebutton">
+                <button type="submit">Save</button>
+            </div>
+            {% if post.modified_date %}<div id="moddate">last updated:<br>{{ post.modified_date }}</div>{% endif %}
+            <label for="id_cats">Categories:</label>
+            <ul class="checklist" id="catlist">
+                {% for slug,name in categories %}
+                <li><input type="checkbox" name="cats" id="cat_{{ slug }}" value="{{ name }}" {% if slug in post.categories %}checked="checked"{% endif %}> <label for="cat_{{ slug }}">{{ name }}</label></li>
+                {% endfor %}
+            </ul>
+            <input type="text" id="newcategory" placeholder="type to add">
+            <div id="delete_wrapper" {% if not post.created_date %}style="display:none;"{% endif %}>
+                <a href="#delete" id="delete_button">Delete this post?</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="main">
+        <div class="pad">
+            <input type="hidden" name="key" value="{{ post.key.name }}">
+
+            <label for="id_title">Title:</label>
+            <input type="text" name="title" id="id_title" value="{{ post.title }}">
+
+            {% if post.slug %}
+            <label for="id_slug">Permalink:</label>
+            {{ settings.BLOG_BASE_URL }}/
+            <span class="slug">{{ post.slug }}</span>
+            <input type="hidden" name="slug" id="id_slug" value="{{ post.slug }}">
+            {% endif %}
+            <br>
+            <br>
+            <div id="findreplace_wrapper" style="display:none;">
+                <label>Find/Replace</label>
+                Find: <input type="text" name="search" id="id_find">
+                Replace: <input type="text" name="replace" id="id_replace">
+                <button type="button" onclick="find_replace(); return false;">Go</button>
+            </div>
+
+            <a href="#" id="findreplace_button">find/replace</a>
+            <label for="id_body">Body</label>
+            <textarea name="body" id="id_body" rows="10" cols="60">{{ post.body }}</textarea>
+            <br>
+            <a href="#excerpt" id="excerpt_button">edit excerpt</a>
+            <div id="excerpt_wrapper" style="display:none;">
+                <label for="id_excerpt">Excerpt</label>
+                <textarea name="excerpt" id="id_excerpt" rows="6" cols="60">{{ post.excerpt }}</textarea>
+            </div>
+
+            <label for="id_tags">Tags:</label>
+            <div id="tags">
+                {% for t in post.tags_set %}
+                <span class="tag">
+                    <input type="hidden" name="tag" value="{{ t.name }}">
+                    {{ t.name }}
+                </span>
+                {% endfor %}
+            </div>
+            <div class="tags">
+                {% for slug,name in tags %}
+                <a href="#{{ slug }}" onclick="return add_tag('{{ name }}');">{{ name }}</a>{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            </div>
+            <input type="text" id="newtag" placeholder="type to add">
+        </div>
+    </div>
+</div>
+</form>
+<form id="deleteform" action="/admin/posts/delete/{{ post.key.name }}/" method="POST">
+    {% csrf_token %}
+    <input type="hidden" name="confirmed" id="deleteconfirm" value="false">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+function add_tag(tag) {
+    var tagspan = document.createElement('span');
+    tagspan.className = 'tag';
+    tagspan.innerHTML = '<input type="hidden" name="tag" value="' + tag + 
+        '">' + tag;
+    
+    var tagdiv = document.getElementById('tags');
+    tagdiv.appendChild(tagspan);
+    
+    return false;
+}
+$(function(){
+    $('#newtag').keydown( function(event) {
+        if (event.which == 13) {
+            event.preventDefault();
+            var tag = $(this).val();
+            add_tag(tag);
+            $(this).val('');
+        }
+    });
+    $('span.tag').live('click', function(event) {
+        $(this).remove();
+    });
+    $('#newcategory').keydown( function(event) {
+        if (event.which == 13) {
+            event.preventDefault();
+            var cat = $(this).val();
+            var slug = cat.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            $('ul#catlist').prepend(
+                '<li><input type="checkbox" name="category" id="cat_' + slug +
+                '" value="' + cat + '" checked="checked"> <label for="cat_' + 
+                slug + '">' + cat + '</label></li>');
+            $(this).val('');
+        }        
+    });
+    $('#id_published').change(function(event) {
+        if ($(this).val() == 'true')
+            $('#pubdate').slideDown('slow');
+        else
+            $('#pubdate').slideUp('slow');
+    });
+    $('#findreplace_button').click(function(event) {
+        $('#findreplace_wrapper').slideToggle();
+    });
+    $('#excerpt_button').click(function(event) {
+        $('#excerpt_wrapper').slideToggle();
+    });
+    $('#delete_button').click(function(event) {
+        event.preventDefault();
+        if (confirm('Are you sure you want to delete this post?')) {
+            $('#deleteconfirm').val('true');
+            $('#deleteform').submit();
+            //window.location = '/admin/posts/delete/{{ post.key.name }}/';
+        }
+    });
+});
+function find_replace () {
+    var f = document.getElementById('id_find').value.replace('\\','\\\\');
+    var r = document.getElementById('id_replace').value.replace('\\n','\n');
+    var b = document.getElementById('id_body');
+    var re = new RegExp(f,'gi');
+    b.value = b.value.replace(re, r);
+}
+</script>
+{% endblock %}

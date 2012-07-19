@@ -1,0 +1,65 @@
+{% extends "blog_base.html" %}
+
+{% block canonical %}{{ canonical_url }}{% endblock %}
+
+{% block headline %}{{ page_title|safe }}{% endblock %}
+{% block title %}{{ page_title|striptags }}{% endblock %}
+
+{% block meta %}
+<meta name="keywords" content="">
+<meta name="description" content="">
+<meta name="robots" content="noindex,follow">
+{% endblock %}
+
+{% block styles %}
+{{ block.super }}
+<style type="text/css">
+    div.blog_post { width:100%; }
+    div.blog_post .split > :first-child { width:460px; }
+</style>
+{% endblock %}
+
+{% block blog_body %}
+<h3 class="heading">{{ page_title|safe }}</h3>
+<div>
+    {% for p in posts %}
+    {% if not forloop.counter|divisibleby:"2" %}<div class="split">{% endif %}
+        <div class="post_teaser">
+            <div>
+                <div class="post_date">
+                    <div class="month_name">{{ p.published_date|date:"b"|title }}</div>{{ p.published_date|date:"j" }}
+                </div>
+                <h4 class="heading"><a href="/{{ p.slug }}/">{{ p.title }}</a></h4>
+                {% if settings.USE_DISQUS %}<div class="post_meta"><a href="{% firstof p.legacy_permalink p.permalink %}#disqus_thread">Comments</a></div>{% endif %}
+            </div>
+            {% with p.get_thumbnail as th %}
+            {% if th %}
+            <img class="thumbnail" src="{{ th.permalink }}" width="{{ th.width }}" height="{{ th.height }}">
+            {% endif %}
+            {% endwith %}
+            <p>{{ p.get_excerpt|safe }}</p>
+        </div>
+    {% if forloop.counter|divisibleby:"2" or forloop.last %}</div>{% endif %}
+    {% endfor %}
+</div>
+<div class="prev_next_links">
+    {% if has_prev %}<a href="{{ path }}page/{{ page|add:"-1" }}/">Previous page</a>{% endif %}
+    {% if has_next %}<a href="{{ path }}page/{{ page|add:"1" }}/">Next page</a>{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if settings.USE_DISQUS %}
+<script type="text/javascript">
+var disqus_shortname = '{{ settins.DISQUS_SHORTNAME }}';
+
+/* * * DON'T EDIT BELOW THIS LINE * * */
+(function () {
+    var s = document.createElement('script'); s.async = true;
+    s.type = 'text/javascript';
+    s.src = 'http://' + disqus_shortname + '.disqus.com/count.js';
+    (document.getElementsByTagName('HEAD')[0] || document.getElementsByTagName('BODY')[0]).appendChild(s);
+}());
+</script>
+{% endif %}
+{% endblock %}

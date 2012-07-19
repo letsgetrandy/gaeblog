@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en:US">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>{% block title %}{% endblock %} {{ settings.BLOG_NAME }}</title>
+    {% block meta %}
+    <meta name="keywords" content="">
+    <meta name="description" content="">
+    {% endblock %}
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="canonical" href="{% block canonical_url %}{% endblock %}">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link type="text/css" rel="stylesheet" href="{{ STATIC_URL }}styles/global.css">
+<style type="text/css">
+* { font-family:Verdana,Arial,sans-serif; }
+html { font-size:14px; line-height:1; }
+body { margin:0; padding:0; }
+a { color: #333; }
+.container {
+    width:950px;
+    margin:0 auto;
+}
+#header {
+    background:#ddd;
+    border-bottom:1px solid #ddd;
+    color:#333;
+    margin:0;
+    padding:1em 0 0 0;
+}
+#header h1,
+#header h2,
+#header li { margin:0; padding:0; }
+#header ul.nav {
+    background: #4c4c4c;
+    margin:1em 0 0 0;
+    padding:5px;
+}
+#header ul.nav li { list-style:none; display:inline; }
+#header h1 {
+    font-size:2.5em;
+    font-weight:600;
+    line-height:1.2;
+    margin-bottom:.2em;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    width:900px;
+}
+#header h2 {
+    font-size:1.3em;
+    font-weight:200;
+    letter-spacing:3px;
+    margin-left:2em;
+}
+#header ul.nav li a { padding:0 5px; text-decoration:none; color:#ccc; }
+#header ul.nav li a:hover {
+    background:#777;
+}
+#footer {
+    clear:both;
+}
+#footer ul.nav {
+    margin:0;
+    padding:2em 0 1em;
+}
+#footer ul.nav li {
+    display:inline;
+    list-style:none;
+    margin:0;
+    padding:0;
+}
+#footer ul.nav li a { color:#555; font-size:.9em; }
+body { background:#eee; }
+</style>
+{% block styles %}{% endblock %}
+<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.js"></script>
+</head>
+
+<body>
+{% block header %}
+<div id="header">
+    <div class="container">
+        <h1>{% block headline %}{% endblock %}</h1>
+        <h2>{{ settings.BLOG_NAME }}</h2>
+        <nav>
+        <ul class="nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/about/">About this site</a></li>
+            <li><a href="/faq/">FAQ</a></li>
+            <li><a href="/contact/">Contact</a></li>
+        </ul>
+        </nav>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content">
+    <div class="container">
+        <div id="wrapper">
+        {% block body %}
+            <div class="content">
+                <div class="secondary">{% block content_secondary %}{% endblock content_secondary %}</div>
+                <div class="primary">{% block content_primary %}{% endblock content_primary %}</div>
+            </div>
+        {% endblock body %}
+        </div>
+    </div>
+</div>
+{% block footer %}
+<div class="container">
+    <div id="footer">
+        <nav>
+        <ul class="nav">
+            <li><small>&copy;{% now "Y" %} {{ settings.BLOG_NAME }}</small></li>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about/">About this site</a></li>
+            <li><a href="/faq/">FAQ</a></li>
+            <li><a href="/contact/">Contact</a></li>
+        </ul>
+        </nav>
+    </div>
+    <div style="clear:both">&nbsp;</div>
+</div>
+{% endblock footer %}
+{% endblock content %}
+<script type="text/javascript" src="{{ STATIC_URL }}scripts/global.js"></script>
+{% block scripts %}
+{% endblock %}
+</body>
+</html>

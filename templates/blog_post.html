@@ -1,0 +1,81 @@
+{% extends "blog_base.html" %}
+
+{% block canonical_url %}{{ post.permalink }}{% endblock %}
+
+{% block headline %}{{ post.title }}{% endblock %}
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block meta %}
+<meta name="keywords" content="{{ feature.body|striptags|truncatewords:50|safe }}">
+<meta name="description" content="{{ post.tags }}">
+<link rel="prev" title="" href="">
+<link rel="next" title="" href="">
+{% endblock %}
+
+{% block blog_body %}
+<h3 class="heading">{{ post.title }}</h3>
+<div>{{ post.body|safe }}</div>
+{% if settings.USE_DISQUS %}
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_url = '{% firstof post.legacy_permalink post.permalink %}/';
+    var disqus_shortname = '{{ settings.DISQUS_SHORTNAME }}';
+
+    /* * * DON'T EDIT BELOW THIS LINE * * */
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+{% endif %}
+{% endblock %}
+
+{% block blog_sidebar %}
+<div class="post_meta">
+    <h4 class="heading">Post Info</h4>
+    <ul>
+        {% if is_admin %}
+        <li><a href="/admin/posts/edit/{{ post.key.name }}/">Edit this post</a></li>
+        {% endif %}
+        <li>{{ post.published_date|date:"b j, Y"|title }}</li>
+        <li><a href="#">Share on Twitter</a></li>
+        <li>See more about: {% for t in post.tags_set %}{% if not forloop.first %}, {% endif %}<a href="{{ t.permalink }}">{{ t.name }}</a>{% endfor %}</li>
+        <li>Filed under: {% for c in post.categories_set %}{% if not forloop.first %}, {% endif %}<a href="{{ c.permalink }}">{{ c.name }}</a>{% endfor %}</li>
+        <li><a href="/feed/">Grab the RSS feed</a></li>
+    </ul>
+    <div style="clear:both;"> </div>
+
+    {% if 0 < links|length %}
+    <h4 class="heading">Links in this post</h4>
+    <ul>
+        {% for l in links %}
+        <li>{{ l|safe }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <h4 class="heading">Related posts</h4>
+    <ul>
+        {% for p in related_posts %}
+        <li><a href="{{ p.permalink }}">{{ p }}</a></li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="blog_meta">
+    <h4 class="heading">Recent posts</h4>
+    <ul>
+        {% for p in recent_posts %}
+        <li><a href="{{ p.permalink }}">{{ p.title }}</a></li>
+        {% endfor %}
+    </ul>
+
+    <h4 class="heading">Blogs I like</h4>
+    <ul>
+        <li><a href="http://www.example.com/">Example.com</a></li>
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "admin_base.html" %}
+
+{% block body %}
+<style>
+input { font-size:.9em; padding:3px; width:200px; }
+</style>
+
+<form method="post">
+{% for p in posts %}
+    <input type="hidden" name="postid" value="{{ p.key.name }}">
+    <strong>{{ p.title }}</strong><br>
+    <input type="text" name="slug{{ p.key.name }}" value="{{ p.get_slug }}">
+    <br><br>
+{% endfor %}
+<button type="submit">Update</button>
+</form>
+
+{% endblock %}
