@@ -158,6 +158,43 @@ class PostHandler(Handler):
                 post.key().name())
 
 
+class PreviewHandler(Handler):
+    def post(self):
+        ''' creates a preview of a blog post '''
+        data = self.request.POST
+        key = data.get('key')
+        if key:
+            post = models.Post.get_by_key_name(key)
+        else:
+            post = models.Post()
+            post.key = {'name': 'preview'}  # dirty hack for template errors
+            post.legacy_permalink = None
+            post.slug = '/'
+
+        post.title = data.get('title')
+        post.body = data.get('body')
+        post.tags = data.getall('tag')
+        post.categories = data.getall('categories')
+
+        formatstr = '%Y-%m-%d %H:%M:%S'
+        pub_date = data.get('published_date')
+        post.published_date = datetime.datetime.strptime(pub_date, formatstr)
+
+        post.body = post.body.replace('\n', '<br>')
+
+        links = post.find_links()
+        #related_posts = post.related_posts()
+
+        self.context_vars = {
+                'post': post,
+                'links': links,
+                'recent_posts': models.Post.recent_posts()[:5],
+                #'related_posts': related_posts,
+            }
+
+        self.render('blog_post.html')
+
+
 class DeleteHandler(Handler):
     ''' handles deleting a post '''
 
@@ -337,33 +374,32 @@ class ProcessImport(Handler):
 
 app = webapp2.WSGIApplication([
 
-        (r'^/admin/$', IndexHandler),
+        (r'/admin/', IndexHandler),
 
-        (r'^/admin/posts/?$', PostsHandler),
-        (r'^/admin/posts/page/(\d+)/?$', PostsHandler),
-        (r'^/admin/posts/new/?$', PostHandler),
-        (r'^/admin/posts/edit/?$', PostHandler),
-        (r'^/admin/posts/edit/([\w-]+)/?$', PostHandler),
-        (r'^/admin/posts/drafts/?$', DraftsHandler),
-        (r'^/admin/posts/delete/([\w-]+)/?$', DeleteHandler),
+        (r'/admin/posts/', PostsHandler),
+        (r'/admin/posts/page/(\d+)/', PostsHandler),
+        (r'/admin/posts/new/', PostHandler),
+        (r'/admin/posts/edit/', PostHandler),
+        (r'/admin/posts/edit/([\w-]+)/', PostHandler),
+        (r'/admin/posts/preview/', PreviewHandler),
+        (r'/admin/posts/drafts/', DraftsHandler),
+        (r'/admin/posts/delete/([\w-]+)/', DeleteHandler),
 
-        (r'^/admin/tags/?$', TagsHandler),
-        (r'^/admin/tags/page/(\d+)/?$', TagsHandler),
-        (r'^/admin/tags/new/?$', TagHandler),
-        (r'^/admin/tags/edit/?$', TagHandler),
-        (r'^/admin/tags/edit/([\w-]+)/?$', TagHandler),
+        (r'/admin/tags/', TagsHandler),
+        (r'/admin/tags/page/(\d+)/', TagsHandler),
+        (r'/admin/tags/new/', TagHandler),
+        (r'/admin/tags/edit/', TagHandler),
+        (r'/admin/tags/edit/([\w-]+)/', TagHandler),
 
-        (r'^/admin/categories/?$', CategoriesHandler),
-        (r'^/admin/categories/page/(\d+)/?$', CategoriesHandler),
-        (r'^/admin/categories/new/([\w-]+)/?$', CategoryHandler),
-        (r'^/admin/categories/edit/?$', CategoryHandler),
-        (r'^/admin/categories/edit/([\w-]+)/?$', CategoryHandler),
+        (r'/admin/categories/', CategoriesHandler),
+        (r'/admin/categories/page/(\d+)/', CategoriesHandler),
+        (r'/admin/categories/new/([\w-]+)/', CategoryHandler),
+        (r'/admin/categories/edit/', CategoryHandler),
+        (r'/admin/categories/edit/([\w-]+)/', CategoryHandler),
 
-        (r'^/admin/import/?$', ImportHandler),
-        (r'^/admin/process_import/?$', ProcessImport),
-        (r'^/admin/update_slugs/?$', UpdSlugs),
-
-        #(r'^/admin/.+$',
+        (r'/admin/import/', ImportHandler),
+        (r'/admin/process_import/', ProcessImport),
+        (r'/admin/update_slugs/', UpdSlugs),
 
     ], debug=True)
 

@@ -4,7 +4,7 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext.webapp import template
 from common import Handler, HandleStaticPage, Handle404
 from pagedquery import PagedQuery
-import webapp2
+from webapp2 import Route, WSGIApplication
 import datetime
 import models
 
@@ -43,19 +43,8 @@ class IndexHandler(Handler):
 class PostHandler(Handler):
     ''' handler for viewing posts '''
 
-    def get(self, *args, **kwargs):
+    def get(self, slug=None, year=None, month=None):
         ''' view a blog post '''
-        if len(args) == 1:
-            #URL format: /post-slug
-            slug = args[0]
-        elif len(args) == 2:
-            #URL format: /YEAR/post-slug
-            slug = args[1]
-        elif len(args) == 3:
-            #URL format: /YEAR/MONTH/post-slug
-            slug = args[2]
-        else:
-            raise Exception('something happened...')
 
         post = models.Post.get_by_key_name(slug)
         if post is None:
@@ -100,6 +89,7 @@ class ArchiveHandler(Handler):
 
     def get(self, year=None, month=None, page=1):
         ''' display one page of archived posts '''
+        page = int(page)
         post_query = models.Post.all().filter('published = ', True).filter(
                     'published_date < ', datetime.datetime.now()
                 ).order('-published_date')
@@ -208,35 +198,42 @@ class ContactPage(HandleStaticPage):
 class FaqPage(HandleStaticPage):
     template_name = 'faq.html'
 
+app = WSGIApplication([
 
-app = webapp2.WSGIApplication([
+        #routes for pages
+        Route(r'/about/', AboutPage, name="about"),
+        Route(r'/contact/', ContactPage, name="contact"),
+	Route(r'/faq/', FaqPage, name="faqs"),
 
-        (r'^/about/?$', AboutPage),
-        (r'^/contact/?$', ContactPage),
-        (r'^/faq/?$', FaqPage),
+        #routes for tags
+        Route(r'/tag/<slug:[\w-]+>/page/<page:\d+>/', TagHandler),
+        Route(r'/tag/<slug:[\w-]+>/', TagHandler, name="view_tag"),
 
-        (r'^/feed.*', RssFeed),
+        #routes for categories
+        Route(r'/topic/<slug:[\w-]+>/page/<page:\d+>/', CategoryHandler),
+        Route(r'/topic/<slug:[\w-]+>/', CategoryHandler, name="view_category"),
 
-        (r'^/wp-content.*', Handle404),
-        (r'^/index.php.*', Handle404),
-        (r'^/js/.*', Handle404),
-        (r'^/css/.*', Handle404),
+        #routes for archives
+        Route(r'/<year:\d+>/<month:\d+>/page/<page:\d+>/', ArchiveHandler),
+        Route(r'/<year:\d+>/<month:\d+>/', ArchiveHandler),
+        Route(r'/<year:\d+>/page/<page:\d+>/', ArchiveHandler),
+        Route(r'/<year:\d+>/', ArchiveHandler),
+        Route(r'/page/<page:\d+>/', ArchiveHandler),
 
-        (r'^/tag/([\w-]+)/page/(\d+)/?$', TagHandler),
-        (r'^/tag/([\w-]+)/?$', TagHandler),
+        #routes for posts
+        Route(r'/<year:\d+>/<month:\d+>/<slug:[\w-]+>/', PostHandler),
+        Route(r'/<year:\d+>/<slug:[\w-]+>/', PostHandler),
+        Route(r'/<slug:[\w-]+>/', PostHandler, name="view_post"),
 
-        (r'^/topic/([\w-]+)/page/(\d+)/?$', CategoryHandler),
-        (r'^/topic/([\w-]+)/?$', CategoryHandler),
+        Route(r'/', IndexHandler, name="index"),
 
-        (r'^/(\d+)/(\d+)/page/(\d+)/?$', ArchiveHandler),
-        (r'^/(\d+)/(\d+)/?$', ArchiveHandler),
+        (r'/feed.*', RssFeed),
 
-        (r'^/(\d+)/(\d+)/([\w-]+)/?$', PostHandler),
-        (r'^/(\d+)/([\w-]+)/?$', PostHandler),
-        (r'^/([\w-]+)/?$', PostHandler),
-
-        (r'^/page/(\d+)/?$', MainArchiveHandler),
-        (r'^/$', IndexHandler),
+        #stop a few hack attempts
+        (r'/wp-content.*', Handle404),
+        (r'/index.php.*', Handle404),
+        (r'/js/.*', Handle404),
+        (r'/css/.*', Handle404),
     ], debug=True)
 
 

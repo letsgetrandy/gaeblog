@@ -114,17 +114,18 @@ ul.checklist li {
             </select>
             <div id="pubdate" {% if not post.published %}style="display:none;"{% endif %}>
                 <label for="id_published_date">Publish Date:</label>
-                <input type="text" name="published_date" id="id_published_date" 
+                <input type="text" name="published_date" id="id_published_date"
                 value="{% if post.published %}{{ post.published_date|date:'Y-m-d H:i:s' }}{% else %}{% now "Y-m-d H:i:s" %}{% endif %}">
             </div>
             <div id="savebutton">
                 <button type="submit">Save</button>
+                <a id="preview_button" href="#">preview</a>
             </div>
             {% if post.modified_date %}<div id="moddate">last updated:<br>{{ post.modified_date }}</div>{% endif %}
             <label for="id_cats">Categories:</label>
             <ul class="checklist" id="catlist">
                 {% for slug,name in categories %}
-                <li><input type="checkbox" name="cats" id="cat_{{ slug }}" value="{{ name }}" {% if slug in post.categories %}checked="checked"{% endif %}> <label for="cat_{{ slug }}">{{ name }}</label></li>
+                <li><input type="checkbox" name="category" id="cat_{{ slug }}" value="{{ name }}" {% if slug in post.categories %}checked="checked"{% endif %}> <label for="cat_{{ slug }}">{{ name }}</label></li>
                 {% endfor %}
             </ul>
             <input type="text" id="newcategory" placeholder="type to add">
@@ -196,12 +197,12 @@ ul.checklist li {
 function add_tag(tag) {
     var tagspan = document.createElement('span');
     tagspan.className = 'tag';
-    tagspan.innerHTML = '<input type="hidden" name="tag" value="' + tag + 
+    tagspan.innerHTML = '<input type="hidden" name="tag" value="' + tag +
         '">' + tag;
-    
+
     var tagdiv = document.getElementById('tags');
     tagdiv.appendChild(tagspan);
-    
+
     return false;
 }
 $(function(){
@@ -223,10 +224,10 @@ $(function(){
             var slug = cat.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
             $('ul#catlist').prepend(
                 '<li><input type="checkbox" name="category" id="cat_' + slug +
-                '" value="' + cat + '" checked="checked"> <label for="cat_' + 
+                '" value="' + cat + '" checked="checked"> <label for="cat_' +
                 slug + '">' + cat + '</label></li>');
             $(this).val('');
-        }        
+        }
     });
     $('#id_published').change(function(event) {
         if ($(this).val() == 'true')
@@ -247,6 +248,12 @@ $(function(){
             $('#deleteform').submit();
             //window.location = '/admin/posts/delete/{{ post.key.name }}/';
         }
+    });
+    $('#preview_button').click(function(event) {
+        event.preventDefault();
+        $('#post_form').attr('action', '/admin/posts/preview/').attr('target', 'blog_preview').submit();
+        $('#post_form').attr('action', '').removeAttr('target');
+        return false;
     });
 });
 function find_replace () {
