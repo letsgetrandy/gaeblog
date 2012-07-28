@@ -142,15 +142,17 @@ class PostHandler(Handler):
         else:
             post.published = False
 
+        posttags = []
         for t in tags:
-            models.Tag.add(t)
-            #post.add_tag(t)
-        post.tags = tags
+            newtag = models.Tag.add(t)
+            posttags.append(newtag.slug)
+        post.tags = posttags
 
+        postcats = []
         for c in cats:
-            models.Category.add(c)
-            #post.add_category(c)
-        post.categories = cats
+            newcat = models.Category.add(c)
+            postcats.append(newcat.slug)
+        post.categories = postcats
 
         post.save()
 
