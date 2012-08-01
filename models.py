@@ -1,6 +1,7 @@
-import re
+import cgi
 import datetime
 import difflib
+import re
 import settings
 from google.appengine.ext import db
 from google.appengine.api import memcache
@@ -114,6 +115,17 @@ class Attachment(db.Model):
         return '%s%s/%s' % (settings.BLOG_STATIC_BASE, filetype, self.filename)
 
 
+class RelatedPost(db.Model):
+    ''' A very minimal model to generate links to related posts '''
+    title = db.StringProperty()
+    score = db.FloatProperty()
+
+    @property
+    def permalink(self):
+        ''' returns the fully-qualified URI to this post '''
+        return '%s/%s' % (settings.BLOG_BASE_URL, self.slug)
+
+
 class Post(db.Model):
     ''' Represents a blog post '''
     published = db.BooleanProperty(default=False)
@@ -204,26 +216,24 @@ class Post(db.Model):
 
     def related_posts(self):
         ''' returns a list containing related posts '''
+
+        posts = RelatedPost().all().ancestor(self).order('-score').fetch(5)
+        if len(posts) < 5:
+            posts = self.update_related_posts()
+        return posts[:5]
+
+    def update_related_posts(self):
+        ''' calculated the related posts '''
+
         a = self.title.lower()
+        cat_set = set(self.categories)
+        tag_set = set(self.tags)
+
         posts = []
-        cat_ids = []
-        tag_ids = []
+        related_posts = []
 
-        for cat in self.categories.all():
-            catset = cat.post_set.filter(
-                    published=True,
-                    published_date__lt=datetime.datetime.now(),
-                )
-            posts.extend(catset)
-            cat_ids.extend([p.id for p in catset])
-
-        for tag in self.tags.all():
-            tagset = tag.post_set.filter(
-                    published=True,
-                    published_date__lt=datetime.datetime.now(),
-                )
-            posts.extend(tagset)
-            tag_ids.extend([p.id for p in tagset])
+        posts.extend(Post.all().filter('cats IN ', self.categories))
+        posts.extend(Post.all().filter('tags IN ', self.tags))
 
         posts = list(set(posts))
         if self in posts:
@@ -231,12 +241,24 @@ class Post(db.Model):
 
         for p in posts:
             seq = difflib.SequenceMatcher(a=a, b=p.title.lower())
-            p.rel = seq.ratio()
-            p.rel += 2 * cat_ids.count(p.id)
-            p.rel += 3 * tag_ids.count(p.id)
+            score = seq.ratio()
+            score += 2 * len(set(p.categories).intersection(cat_set))
+            score += 3 * len(set(p.tags).intersection(tag_set))
 
-        posts.sort(key=lambda x: x.rel, reverse=True)
-        return posts[:5]
+            if p.key().name() != self.key().name():
+                rel = RelatedPost(parent=self, key_name=p.slug)
+                rel.title = p.title
+                rel.score = score
+                rel.put()
+                related_posts.append(rel)
+
+                rel = RelatedPost(parent=p, key_name=self.slug)
+                rel.title = self.title
+                rel.score = score
+                rel.put()
+
+        related_posts.sort(key=lambda x: x.score, reverse=True)
+        return related_posts
 
     def find_links(self):
         ''' returns a list of links in the post body '''
@@ -256,6 +278,26 @@ class Post(db.Model):
                 href = m2.group(1)
                 links.append('<a href="%s">%s</a>' % (href, label))
         return links
+
+    def formatted(self):
+        ''' format the post for HTML '''
+        s = 0
+        t = []
+        while s > -1:
+            m = self.body.find('<pre', s)
+            t.append(self.body[s:m].replace('\n', '<br>\n'))
+            s = m
+            if s > -1:
+                m = self.body.find('>', s)
+                t.append(self.body[s:m + 1])  # append the pre tag
+                s = m + 1
+                m = self.body.find('</pre>', s)
+                if m > -1:
+                    t.append(cgi.escape(self.body[s:m]) + '</pre')
+                    #t.append(self.body[s:m] + '</pre')
+                    s = m + 5
+        t.append(self.body[-1:])
+        return ''.join(t)
 
     @staticmethod
     def slugify(title):

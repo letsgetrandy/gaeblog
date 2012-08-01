@@ -14,7 +14,7 @@
 
 {% block blog_body %}
 <h3 class="heading">{{ post.title }}</h3>
-<div>{{ post.body|safe }}</div>
+<div>{{ post.formatted|safe }}</div>
 {% if settings.USE_DISQUS %}
 <div id="disqus_thread"></div>
 <script type="text/javascript">
@@ -60,7 +60,7 @@
     <h4 class="heading">Related posts</h4>
     <ul>
         {% for p in related_posts %}
-        <li><a href="{{ p.permalink }}">{{ p }}</a></li>
+        <li><a href="/{{ p.key.name }}/">{{ p.title }}</a></li>
         {% endfor %}
     </ul>
 </div>

@@ -81,10 +81,9 @@ body { background:#eee; }
 <div id="header">
     <div class="container">
         <h1>{% block headline %}{% endblock %}</h1>
-        <h2>{{ settings.BLOG_NAME }}</h2>
+        <h2><a href="/">{{ settings.BLOG_NAME }}</a></h2>
         <nav>
         <ul class="nav">
-            <li><a href="/">Home</a></li>
             <li><a href="/about/">About this site</a></li>
             <li><a href="/faq/">FAQ</a></li>
             <li><a href="/contact/">Contact</a></li>
@@ -94,6 +93,7 @@ body { background:#eee; }
 </div>
 {% endblock %}
 
+{% block feature %}{% endblock %}
 {% block content %}
 <div id="content">
     <div class="container">

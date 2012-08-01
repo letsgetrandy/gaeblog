@@ -4,7 +4,14 @@
 {% block headline %}{% firstof title "Edit Post" %}{% endblock %}
 
 {% block styles %}
+<link rel="stylesheet" type="text/css" href="/styles/codemirror.css">
 <style type="text/css">
+.CodeMirror { 
+    border: 1px solid #aaa;
+    -webkit-box-shadow:inset 0px 1px 2px #999;
+    -moz-box-shadow:inset 0px 1px 2px #999;
+    box-shadow:inset 0px 1px 2px #999;
+}
 div.pad { position:relative; margin:10px; }
 #main label { display:block; font-weight:bold; }
 label { margin-top:1em; }
@@ -193,7 +200,14 @@ ul.checklist li {
 {% endblock %}
 
 {% block scripts %}
+<script type="text/javascript" src="/scripts/codemirror/codemirror.js"></script>
+<script type="text/javascript" src="/scripts/codemirror/modes/xml.js"></script>
 <script type="text/javascript">
+var editor = CodeMirror.fromTextArea($("#id_body")[0], {
+    mode: 'xml',
+    lineNumbers: true,
+    lineWrapping: true
+});    
 function add_tag(tag) {
     var tagspan = document.createElement('span');
     tagspan.className = 'tag';

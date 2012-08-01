@@ -24,4 +24,5 @@ DISQUS_SITE_NAME = 'http://www.myblog.com/'
 #admin emails
 BLOG_ADMINS = [
         u'test@example.com',
+        u'randy@bbqiguana.com',
     ]

@@ -30,8 +30,6 @@ class IndexHandler(Handler):
             posts = []
         has_next = (len(posts_set) > 5)
 
-        feature.body = feature.body.replace('\n', '<br>')
-
         self.context_vars = {
                 'has_next': has_next,
                 'feature': feature,
@@ -69,16 +67,14 @@ class PostHandler(Handler):
             post.delete()
             post = p
 
-        post.body = post.body.replace('\n', '<br>')
-
         links = post.find_links()
-        #related_posts = post.related_posts()
+        related_posts = post.related_posts()
 
         self.context_vars = {
                 'post': post,
                 'links': links,
                 'recent_posts': models.Post.recent_posts()[:5],
-                #'related_posts': related_posts,
+                'related_posts': related_posts,
             }
 
         self.render('blog_post.html')
@@ -234,6 +230,9 @@ app = WSGIApplication([
         (r'/index.php.*', Handle404),
         (r'/js/.*', Handle404),
         (r'/css/.*', Handle404),
+
+        #catch-all
+        (r'/.*', Handle404),
     ], debug=True)
 
 

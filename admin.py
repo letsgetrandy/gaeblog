@@ -4,7 +4,7 @@ from google.appengine.ext import db
 from google.appengine.api import taskqueue, memcache
 from google.appengine.ext.webapp.util import run_wsgi_app
 from operator import itemgetter
-from common import Handler
+from common import Handler, Handle404
 from pagedquery import PagedQuery
 import webapp2
 import models
@@ -108,7 +108,6 @@ class PostHandler(Handler):
 
         published_date = data.get('published_date')
         published = data.get('published')
-        excerpt = data.get('excerpt')
 
         slug = data.get('slug')
         title = data.get('title')
@@ -129,8 +128,9 @@ class PostHandler(Handler):
         post.slug = slug
         post.title = title
         post.body = data.get('body')
-        if excerpt:
-            post.excerpt = excerpt
+        post.excerpt = data.get('excerpt')
+        #if excerpt:
+        #    post.excerpt = excerpt
 
         formatstr = '%Y-%m-%d %H:%M:%S'
 
@@ -155,6 +155,7 @@ class PostHandler(Handler):
         post.categories = postcats
 
         post.save()
+        post.update_related_posts()
 
         return self.redirect('/admin/posts/edit/%s/?updated=true' %
                 post.key().name())
@@ -403,6 +404,8 @@ app = webapp2.WSGIApplication([
         (r'/admin/process_import/', ProcessImport),
         (r'/admin/update_slugs/', UpdSlugs),
 
+	    #catch-all
+        (r'/.*', Handle404),
     ], debug=True)
 
 
