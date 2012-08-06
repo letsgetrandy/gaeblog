@@ -4,7 +4,7 @@ from google.appengine.ext import db
 from google.appengine.api import taskqueue, memcache
 from google.appengine.ext.webapp.util import run_wsgi_app
 from operator import itemgetter
-from common import Handler, Handle404
+from handlers import AdminHandler, Handler, Handle404
 from pagedquery import PagedQuery
 import webapp2
 import models
@@ -12,17 +12,17 @@ import datetime
 import wordpress
 
 
-class IndexHandler(Handler):
+class IndexHandler(AdminHandler):
     ''' for the admin home page '''
-
-    require_admin = True
 
     def get(self):
         ''' display the admin main page '''
         self.render('admin_index.html')
 
 
-class UpdSlugs(Handler):
+class UpdSlugs(AdminHandler):
+    ''' '''
+
     def get(self):
         p = models.Post.all().filter('slug = ', None).fetch(1000)
         self.context_vars = {
@@ -43,10 +43,8 @@ class UpdSlugs(Handler):
         return
 
 
-class PostsHandler(Handler):
+class PostsHandler(AdminHandler):
     ''' display all posts '''
-
-    require_admin = True
 
     def get(self, page=1):
         query = models.Post.all().order('-published_date')
@@ -59,10 +57,8 @@ class PostsHandler(Handler):
         return self.render('admin_posts.html')
 
 
-class DraftsHandler(Handler):
+class DraftsHandler(AdminHandler):
     ''' display drafts '''
-
-    require_admin = True
 
     def get(self, page=1):
         query = models.Post.all().filter('published = ', False).order('-created_date')
@@ -76,10 +72,8 @@ class DraftsHandler(Handler):
         return self.render('admin_posts.html')
 
 
-class PostHandler(Handler):
+class PostHandler(AdminHandler):
     ''' handles adding/editing a blog post '''
-
-    require_admin = True
 
     def get(self, keyname=None):
         ''' show the blog post edit form '''
@@ -161,7 +155,8 @@ class PostHandler(Handler):
                 post.key().name())
 
 
-class PreviewHandler(Handler):
+class PreviewHandler(AdminHandler):
+
     def post(self):
         ''' creates a preview of a blog post '''
         data = self.request.POST
@@ -198,10 +193,8 @@ class PreviewHandler(Handler):
         self.render('blog_post.html')
 
 
-class DeleteHandler(Handler):
+class DeleteHandler(AdminHandler):
     ''' handles deleting a post '''
-
-    require_admin = True
 
     def post(self, key=None):
         ''' handle deleting a post '''
@@ -210,17 +203,15 @@ class DeleteHandler(Handler):
 
         post = models.Post.get_by_key_name(key)
         if post is None:
-            return self.error(404)
+            return self.abort(404)
 
         post.delete()
         memcache.delete('recent_posts')
         return self.redirect('/admin/posts/')
 
 
-class TagsHandler(Handler):
+class TagsHandler(AdminHandler):
     ''' display all tags for selection when editing '''
-
-    require_admin = True
 
     def get(self, page=1):
         ''' show the admin page for tags '''
@@ -233,10 +224,8 @@ class TagsHandler(Handler):
         return self.render('admin_tags.html')
 
 
-class TagHandler(Handler):
+class TagHandler(AdminHandler):
     ''' add new or edit existing tag '''
-
-    require_admin = True
 
     def get(self, keyname=None):
         ''' show the edit page for a tag '''
@@ -249,10 +238,8 @@ class TagHandler(Handler):
         return self.render('admin_tag_form.html')
 
 
-class CategoriesHandler(Handler):
+class CategoriesHandler(AdminHandler):
     ''' display all categories, for selection when editing '''
-
-    require_admin = True
 
     def get(self, page=1):
         ''' show the admin page for categories '''
@@ -263,10 +250,8 @@ class CategoriesHandler(Handler):
         return self.render('admin_categories.html')
 
 
-class CategoryHandler(Handler):
+class CategoryHandler(AdminHandler):
     ''' add new, or edit existing category '''
-
-    require_admin = True
 
     def get(self, keyname=None):
         ''' show the edit page for a category '''
@@ -279,16 +264,22 @@ class CategoryHandler(Handler):
         return self.render('admin_category_form.html')
 
 
-class ImportFile(db.Model):
-    source = db.StringProperty()
+class Import(db.Model):
+    ''' Represents a single import job '''
+    source = db.StringProperty()  # eg, "wordpress"
+    created = db.DateTimeProperty(auto_now_add=True)
+    link_path = db.StringProperty()
+    img_path = db.StringProperty()
+    orig_url = db.StringProperty()
+
+
+class FileChunk(db.Model):
     order = db.IntegerProperty()
     data = db.TextProperty()
 
 
-class ImportHandler(Handler):
+class ImportHandler(AdminHandler):
     ''' client-facing form for uploading import files '''
-
-    require_admin = True
 
     def get(self):
         ''' show the upload form '''
@@ -297,9 +288,12 @@ class ImportHandler(Handler):
     def post(self):
         ''' store the xml in the database and queue the task to process '''
         importfile = self.request.get('wpfile')
-        linkpath = self.request.get('linkpath')
-        imgpath = self.request.get('imgpath')
-        origurl = self.request.get('origurl')
+
+        import_job = Import()
+        import_job.link_path = self.request.get('linkpath')
+        import_job.img_path = self.request.get('imgpath')
+        import_job.orig_url = self.request.get('origurl')
+        import_job.put()
 
         s = importfile.decode('utf-8')
 
@@ -312,8 +306,7 @@ class ImportHandler(Handler):
         order = 0
         for c in chunks:
             order += 1
-            f = ImportFile()
-            f.source = "wordpress"
+            f = FileChunk(parent=import_job)
             f.order = order
             f.data = c
             f.put()
@@ -325,10 +318,11 @@ class ImportHandler(Handler):
                 url='/admin/process_import/',
                 queue_name='import',
                 params={
+                        'job': import_job.key().id(),
                         'keys': k,
-                        'origurl': origurl,
-                        'imgpath': imgpath,
-                        'linkpath': linkpath,
+                        #'origurl': origurl,
+                        #'imgpath': imgpath,
+                        #'linkpath': linkpath,
                         'source': 'wordpress',
                     },
                 target='importworker',
@@ -346,32 +340,31 @@ class ProcessImport(Handler):
 
         #load the chunked data
         xml = ''
-        keys = self.request.get('keys')
+        job = self.request.get('job')
+        #keys = self.request.get('keys')
         #raise Exception('keys: ' + keys)
 
-        for key in keys.split(','):
-            f = ImportFile.get_by_id(int(key))
-            if f is None:
-                return
-            xml += f.data
-            f.delete()
+        job = Import().get_by_id()
+        chunks = FileChunk().all().parent(job).order('order')
+        for chunk in chunks:
+            xml += chunk.data
 
-        #raise Exception('success')
-
-        #get passed params
-        source = self.request.get('source')
-        origurl = self.request.get('origurl')
-        imgpath = self.request.get('imgpath')
-        linkpath = self.request.get('linkpath')
+        #for key in keys.split(','):
+        #    f = ImportChunk.get_by_id(int(key))
+        #    if f is None:
+        #        return
+        #    xml += f.data
+        #    f.delete()
 
         #pick the right importer class
-        if source == 'wordpress':
-            importer = wordpress.Import(origurl=origurl, imgpath=imgpath, linkpath=linkpath)
+        if job.source == 'wordpress':
+            importer = wordpress.Import(job)
         else:
             return
 
         #import the data
         importer.process(xml)
+        job.delete()
         return
 
 
@@ -404,7 +397,7 @@ app = webapp2.WSGIApplication([
         (r'/admin/process_import/', ProcessImport),
         (r'/admin/update_slugs/', UpdSlugs),
 
-	    #catch-all
+        #catch-all
         (r'/.*', Handle404),
     ], debug=True)
 

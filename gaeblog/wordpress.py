@@ -29,10 +29,10 @@ class Import():
     imgre = None
     linkre = None
 
-    def __init__(self, *args, **kwargs):
-        self.origurl = kwargs.get('origurl', None)
-        self.imgpath = kwargs.get('imgpath', None)
-        self.linkpath = kwargs.get('linkpath', None)
+    def __init__(self, job):
+        self.origurl = job.orig_url  # kwargs.get('origurl', None)
+        self.imgpath = job.img_path  # kwargs.get('imgpath', None)
+        self.linkpath = job.link_path  # kwargs.get('linkpath', None)
 
     def process(self, xml):
         ''' process the import '''

@@ -110,6 +110,7 @@ ul.checklist li {
 
 {% block body %}
 <form id="post_form" method="post">
+{% csrf_token %}
 <div class="split flip">
     <div class="post_meta">
         <div class="pad">
@@ -171,7 +172,7 @@ ul.checklist li {
             <a href="#excerpt" id="excerpt_button">edit excerpt</a>
             <div id="excerpt_wrapper" style="display:none;">
                 <label for="id_excerpt">Excerpt</label>
-                <textarea name="excerpt" id="id_excerpt" rows="6" cols="60">{{ post.excerpt }}</textarea>
+                <textarea name="excerpt" id="id_excerpt" rows="6" cols="60">{% firstof post.excerpt "" %}</textarea>
             </div>
 
             <label for="id_tags">Tags:</label>

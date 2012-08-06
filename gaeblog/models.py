@@ -115,6 +115,18 @@ class Attachment(db.Model):
         return '%s%s/%s' % (settings.BLOG_STATIC_BASE, filetype, self.filename)
 
 
+class ImageVariant(db.Model):
+    attachment = db.IntegerProperty()
+    name = db.StringProperty()
+    width = db.IntegerProperty()
+    height = db.IntegerProperty()
+    filename = db.StringProperty()
+
+    @property
+    def permalink(self):
+        return '%simages/%s' % (settings.BLOG_STATIC_BASE, self.filename)
+
+
 class RelatedPost(db.Model):
     ''' A very minimal model to generate links to related posts '''
     title = db.StringProperty()
@@ -334,15 +346,3 @@ class Comment(db.Model):
     email = db.StringProperty()
     url = db.StringProperty()
     text = db.TextProperty()
-
-
-class ImageVariant(db.Model):
-    attachment = db.IntegerProperty()
-    name = db.StringProperty()
-    width = db.IntegerProperty()
-    height = db.IntegerProperty()
-    filename = db.StringProperty()
-
-    @property
-    def permalink(self):
-        return '%simages/%s' % (settings.BLOG_STATIC_BASE, self.filename)

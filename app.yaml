@@ -23,11 +23,11 @@ handlers:
   static_dir: static/images
 
 - url: /admin/.*
-  script: admin.app
+  script: gaeblog.admin.app
   login: admin
 
 - url: .*
-  script: main.app
+  script: gaeblog.app
 
 libraries:
 - name: webapp2

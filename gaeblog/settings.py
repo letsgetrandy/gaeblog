@@ -1,11 +1,6 @@
-import os
-
-
-#basic values
-PROJECT_ROOT = os.path.dirname(__file__)
-
-#template path
-TEMPLATES = os.path.join(PROJECT_ROOT, 'templates', '%s')
+# general config
+THEME = 'grayscale'
+TEMPLATES = 'templates'
 
 #blog settings
 BLOG_NAME = 'My Awesome Blog'
@@ -24,5 +19,4 @@ DISQUS_SITE_NAME = 'http://www.myblog.com/'
 #admin emails
 BLOG_ADMINS = [
         u'test@example.com',
-        u'randy@bbqiguana.com',
     ]
