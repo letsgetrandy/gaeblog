@@ -1,38 +1,121 @@
 from google.appengine.api import memcache
-from xml.etree import ElementTree
+from xml.parsers import expat
 import models
 import datetime
+import gc
+import phpserialize as php
 import settings
 import re
 
 
-xmlns = {
-        'excerpt': "http://wordpress.org/export/1.2/excerpt/",
-        'content': "http://purl.org/rss/1.0/modules/content/",
-        'wfw': "http://wellformedweb.org/CommentAPI/",
-        'dc': "http://purl.org/dc/elements/1.1/",
-        'wp': "http://wordpress.org/export/1.2/",
-    }
-try:
-    register_namespace = ElementTree.register_namespace
-except AttributeError:
-    def register_namespace(prefix, uri):
-        ElementTree._namespace_map[uri] = prefix
-for prefix, uri in xmlns.items():
-    register_namespace(prefix, uri)
+class WPItem():
+    ''' helper object representation of an <item> in wordpress export '''
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.id = ''
+        self.parent = ''
+        self.parent_key = ''
+        self.post_type = ''
+        self.status = ''
+        self.title = ''
+        self.slug = ''
+        self.url = ''
+        self.body = ''
+        self.post_date = ''
+        self.pub_date = ''
+        self.featured_image = ''
+        self.cat_type = ''
+        self.cat_name = ''
+        self.categories = {}
+        self.tags = {}
+        self.meta_key = ''
+        self.meta_val = ''
+        self.postmeta = {}
+        gc.collect()
+
+    def save(self):
+        if self.post_type == 'post':
+            self.save_post()
+        elif self.post_type == 'attachment':
+            self.save_attachment()
+
+    def save_post(self):
+        if not self.slug:
+            self.slug = str(self.id)
+        post = models.Post().get_or_insert(key_name=self.slug)
+        post.title = self.title
+        post.legacy_permalink = self.url
+        post.body = self.body
+        post.created_date = datetime.datetime.strptime(self.post_date, "%Y-%m-%d %H:%M:%S")
+        post.featured_img = self.postmeta.get('_thumbnail_id')
+        post.categories = self.categories.keys()
+        post.tags = self.tags.keys()
+        if self.status == 'publish':
+            post.published = True
+            post.published_date = self.parse_published_date(self.pub_date)
+        post.put()
+
+    def save_attachment(self):
+        if not self.parent_key:
+            return
+
+        parent = models.Post.get_by_key_name(self.parent_key)
+
+        if not parent:
+            return
+        att = models.Attachment.get_or_insert(
+                str(self.id),
+                parent=parent,
+            )
+        att.title = self.title
+        att.filename = self.url
+        att.put()
+
+        metadata = self.postmeta.get('_wp_attachment_metadata').encode('utf-8')
+        data = php.loads(metadata)
+        if 'sizes' in data:
+            for key, val in data['sizes'].items():
+                var = models.ImageVariant.get_or_insert(
+                        parent=att, key_name=key)
+                var.width = int(val['width'])
+                var.height = int(val['height'])
+                var.filename = val['file']
+                var.save()
+
+    def parse_published_date(self, pubDate):
+        ''' helper to process rss dates '''
+        if pubDate is None:
+            return None
+        if pubDate[-19:] == '0001 00:00:00 +0000':
+            return None
+        p = pubDate
+        try:
+            offset = int(p[-5:])
+        except:
+            offset = 0
+        delta = datetime.timedelta(hours=offset)
+        publish_date = datetime.datetime.strptime(p[:-6], "%a, %d %b %Y %H:%M:%S")
+        publish_date -= delta
+        return publish_date
 
 
 class Import():
 
-    datefmt1 = "%Y-%m-%d %H:%M:%S"
-    datefmt2 = "%a, %d %b %Y %H:%M:%S"
     imgre = None
     linkre = None
+    filere = None
+
+    job = None
+    postids = {}
 
     def __init__(self, job):
-        self.origurl = job.orig_url  # kwargs.get('origurl', None)
-        self.imgpath = job.img_path  # kwargs.get('imgpath', None)
-        self.linkpath = job.link_path  # kwargs.get('linkpath', None)
+        self.origurl = job.orig_url
+        self.imgpath = job.img_path
+        self.linkpath = job.link_path
+        self.job = job
 
     def process(self, xml):
         ''' process the import '''
@@ -43,6 +126,8 @@ class Import():
                 self.imgre = re.compile(
                         r'<img([^>]+src=["\']?)%s%s([^\s"\']+)([\s"\'][^>]+)>' %
                         (self.origurl, self.imgpath))
+                self.filere = re.compile(
+                        r'%s%s(.*)' % (self.origurl, self.imgpath))
             if self.linkpath:
                 self.linkre = re.compile(
                         r'<a([^>]+href=["\']?)%s%s([^\s"\']+)([\s"\'][^>]+)>' %
@@ -52,48 +137,15 @@ class Import():
         self.cat_dict = models.Category.get_dict()
         self.tag_dict = models.Tag.get_dict()
 
-        #build the source tree
-        tree = ElementTree.fromstring(xml.encode('utf-8'))
+        #re-encode the xml
+        xml = xml.encode('utf-8')
 
-        #iterate the source tree
-        for item in tree.findall("channel/item"):
-            wptype = item.find('{%s}post_type' % xmlns['wp']).text
-
-            if wptype == 'post':
-                self.import_post(item)
-
-            #elif wptype == 'attachment':
-            #    self.import_attachment(item)
+        #process posts
+        self.import_items(xml)
 
         #update the cached tag and category dicts
         memcache.set('cat_dict', self.cat_dict, 3600)
         memcache.set('tag_dict', self.tag_dict, 3600)
-
-    def get_meta(self, item, find_key):
-        ''' helper to find a particular meta tag '''
-        post_meta = item.findall('{%s}postmeta' % xmlns['wp'])
-        for m in post_meta:
-            key = m.find('{%s}meta_key' % xmlns['wp']).text
-            val = m.find('{%s}meta_value' % xmlns['wp']).text
-            if key == find_key:
-                return val
-        return None
-
-    def parse_published_date(self, pubDate):
-        ''' helper to process rss dates '''
-        if pubDate is None:
-            return None
-        if pubDate.text[-19:] == '0001 00:00:00 +0000':
-            return None
-        p = pubDate.text
-        try:
-            offset = int(p[-5:])
-        except:
-            offset = 0
-        delta = datetime.timedelta(hours=offset)
-        publish_date = datetime.datetime.strptime(p[:-6], self.datefmt2)
-        publish_date -= delta
-        return publish_date
 
     def scrub(self, postbody):
         s = postbody
@@ -106,48 +158,96 @@ class Import():
 
         return s
 
-    def import_post(self, item):
-        ''' process the import of a post '''
-        wpid = item.find('{%s}post_id' % xmlns['wp']).text
-        wpstat = item.find('{%s}status' % xmlns['wp']).text
-        slug = item.find('{%s}post_name' % xmlns['wp']).text
+    def import_items(self, xml):
+        parser = None
+        stack = []
+        item = WPItem()
+        post_type = ''
+        post_ids = {}
 
-        post = models.Post.get_or_insert(
-                key_name=slug or str(wpid),
-            )
-        post.title = item.find('title').text
-        post.body = self.scrub(item.find('{%s}encoded' % xmlns['content']).text)
-        post.slug = slug
-        post.legacy_permalink = item.find('link').text
+        def start_elem(name, attrs):
+            stack.append(name)
+            if stack[-2:] == ['item', 'category']:
+                #print parser.GetInputContext(), attrs
+                item.cat_type = attrs['domain']
+                item.cat_name = attrs['nicename']
+            #print "Start element: ", name, attrs
+            #print "Context: ", parser.GetInputContext()
 
-        c = item.find('{%s}post_date' % xmlns['wp']).text
-        post.created_date = datetime.datetime.strptime(c, self.datefmt1)
+        def char_data(data):
+            if stack[0:3] != ['rss', 'channel', 'item']:
+                return
 
-        if wpstat == 'publish':
-            post.published = True
-            pd = item.find('pubDate')
-            post.published_date = self.parse_published_date(pd)
+            xpath = '/'.join(stack[3:])
 
-        #post.featured_img = self.get_thumbnail(item)
+            if xpath == 'wp:post_type':
+                item.post_type = data
+            elif xpath == 'title':
+                item.title = data
+            elif xpath == 'wp:status':
+                item.status = data
+            elif xpath == 'wp:post_name':
+                item.slug = data
+            elif xpath == 'link':
+                item.url = data
+            elif xpath == 'wp:post_id':
+                item.id = data
+            elif xpath == 'wp:post_date':
+                item.post_date = data
+            elif xpath == 'pubDate':
+                item.pub_date = data
+            elif xpath == 'content:encoded':
+                item.body += self.scrub(data)
+            elif xpath == 'category':
+                if item.cat_type == 'category':
+                    item.categories[item.cat_name] = data
+                    self.check_category(item.cat_name, data)
+                elif item.cat_type == 'post_tag':
+                    item.tags[item.cat_name] = data
+                    self.check_tag(item.cat_name, data)
+            elif xpath == 'guid':
+                if self.filere:
+                    data = self.filere.sub(r'\1', data)
+                item.url = data
+            elif xpath == 'wp:post_parent':
+                item.parent = data
+            elif xpath == 'wp:postmeta/wp:meta_key':
+                item.meta_key = data
+            elif xpath == 'wp:postmeta/wp:meta_value':
+                item.meta_val = data
 
-        #wordpress exports tags and categories under the same name
-        cats = item.findall('category')
-        for ctg in cats:
-            cat_type = ctg.attrib['domain']
-            cat_slug = ctg.attrib['nicename']
-            cat_name = ctg.text
-            if cat_type == 'category':
-                if not cat_slug in post.categories:
-                    post.categories.append(cat_slug)
-                self.check_category(cat_slug, cat_name)
+        def end_elem(name):
+            stack.pop()
+            if name == 'category':
+                item.cat_name = ''
+                item.cat_type = ''
+            elif name == 'wp:postmeta':
+                item.postmeta[item.meta_key] = item.meta_val
+                item.meta_key = ''
+                item.meta_val = ''
+            elif name == 'item':
+                if post_type == item.post_type:
+                    if post_type == 'attachment':
+                        item.parent_key = post_ids.get(item.parent)
+                    item.save()
+                    if post_type == 'post':
+                        post_ids[item.id] = item.slug
+                item.reset()
+                gc.collect()
 
-            elif cat_type == 'post_tag':
-                if not cat_slug in post.tags:
-                    post.tags.append(cat_slug)
-                self.check_tag(cat_slug, cat_name)
+        post_type = 'post'
+        parser = expat.ParserCreate('utf-8')
+        parser.StartElementHandler = start_elem
+        parser.EndElementHandler = end_elem
+        parser.CharacterDataHandler = char_data
+        parser.Parse(xml)
 
-        post.save()
-        return
+        post_type = 'attachment'
+        parser = expat.ParserCreate('utf-8')
+        parser.StartElementHandler = start_elem
+        parser.EndElementHandler = end_elem
+        parser.CharacterDataHandler = char_data
+        parser.Parse(xml)
 
     def check_category(self, slug, name):
         ''' create category only if it doesn't already exist '''
@@ -164,7 +264,3 @@ class Import():
                     key_name=slug, slug=slug, name=name
                 ).put()
             self.tag_dict[slug] = name
-
-    def import_attachment(self, item):
-        ''' not implemented. '''
-        return

@@ -5,7 +5,7 @@
 
 {% block styles %}
 <style>
-    label { display:block; font-weight:bold; margin-top:2em; }
+    .label { display:block; font-weight:bold; margin-top:2em; }
     button[type=submit] { padding:4px 9px; font-size:1em; }
     input[type=text] { width:300px; }
     .eg { font-size:.9em; color:#666; }
@@ -14,29 +14,30 @@
 
 {% block body %}
 <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
     <label>Choose Wordpress file to import</label>
-    <input type="file" name="wpfile">
+    <input type="file" name="wpfile"><br>
     <br>
-    
-    <label>Site exported from:</label>
-    <input type="text" name="origurl" placeholder="http://www.yourwebsite.com/">
+    <div><strong>Site exported from:</strong></div>
+    <input type="text" name="origurl" placeholder="http://www.yourwebsite.com/"><br>
     <br>
-
-    <label>Replace image paths?</label>
-    <input type="radio" name="imgpath" value="wp-content/uploads/\d+/\d+/">
-    <span class="eg">http://www.yourwebsite.com/wp-content/uploads/2009/05/someimage.jpg</span><br>
-    <input type="radio" name="imgpath" value="wp-content/uploads/">
-    <span class="eg">http://www.yourwebsite.com/wp-content/uploads/someimage.jpg</span><br>
-    <input type="radio" name="imgpath" value="" checked="true"> Do not replace image paths<br>
-
-    <label>Replace hyperlinks?</label>
-    <input type="radio" name="linkpath" value="\d+/\d+/">
-    <span class="eg">http://www.yourwebsite.com/2009/05/slug-to-your-post</span><br>
-    <input type="radio" name="linkpath" value="\d+/">
-    <span class="eg">http://www.yourwebsite.com/2009/slug-to-your-post</span><br>
-    <input type="radio" name="linkpath" value="/">
-    <span class="eg">http://www.yourwebsite.com/slug-to-your-post</span><br>
-    <input type="radio" name="linkpath" value="" checked="true"> Do not replace hyperlinks<br>
+    <div><strong>Replace image paths?</strong></div>
+    <input id="imgpath1" type="radio" name="imgpath" value="wp-content/uploads/\d+/\d+/">
+    <label for="imgpath1" class="eg">http://www.yourwebsite.com/wp-content/uploads/2009/05/someimage.jpg</label><br>
+    <input id="imgpath2" type="radio" name="imgpath" value="wp-content/uploads/">
+    <label for="imgpath2" class="eg">http://www.yourwebsite.com/wp-content/uploads/someimage.jpg</label><br>
+    <input id="imgpath3" type="radio" name="imgpath" value="" checked="true">
+    <label for="imgpath3">Do not replace image paths</label><br>
+    <br>
+    <div><strong>Replace hyperlinks?</strong></div>
+    <input id="linkpath1" type="radio" name="linkpath" value="\d+/\d+/">
+    <label for="linkpath1" class="eg">http://www.yourwebsite.com/2009/05/slug-to-your-post</label><br>
+    <input id="linkpath2" type="radio" name="linkpath" value="\d+/">
+    <label for="linkpath2" class="eg">http://www.yourwebsite.com/2009/slug-to-your-post</label><br>
+    <input id="linkpath3" type="radio" name="linkpath" value="/">
+    <label for="linkpath3" class="eg">http://www.yourwebsite.com/slug-to-your-post</label><br>
+    <input id="linkpath4" type="radio" name="linkpath" value="" checked="true">
+    <label for="linkpath4">Do not replace hyperlinks</label><br>
 
     <br>
     <br>

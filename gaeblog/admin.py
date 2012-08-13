@@ -39,7 +39,7 @@ class UpdSlugs(AdminHandler):
             post.slug = slug
             post.put()
 
-        self.response.write('done')
+        self.response.out.write('done')
         return
 
 
@@ -289,7 +289,7 @@ class ImportHandler(AdminHandler):
         ''' store the xml in the database and queue the task to process '''
         importfile = self.request.get('wpfile')
 
-        import_job = Import()
+        import_job = Import(source="wordpress")
         import_job.link_path = self.request.get('linkpath')
         import_job.img_path = self.request.get('imgpath')
         import_job.orig_url = self.request.get('origurl')
@@ -302,7 +302,6 @@ class ImportHandler(AdminHandler):
         chunks = [s[start:start + size] for start in range(0, len(s), size)]
 
         #save the chunked data
-        keys = []
         order = 0
         for c in chunks:
             order += 1
@@ -310,60 +309,49 @@ class ImportHandler(AdminHandler):
             f.order = order
             f.data = c
             f.put()
-            keys.append(f.key().id())
 
         #queue backend task to process the import
-        k = ','.join([str(key) for key in keys])
         taskqueue.add(
                 url='/admin/process_import/',
                 queue_name='import',
                 params={
                         'job': import_job.key().id(),
-                        'keys': k,
-                        #'origurl': origurl,
-                        #'imgpath': imgpath,
-                        #'linkpath': linkpath,
-                        'source': 'wordpress',
                     },
                 target='importworker',
             )
 
         #let the user know something happened
-        self.response.out.write('done.<br>' + k)
+        self.response.out.write('created import job #' + str(import_job.key().id()))
 
 
 class ProcessImport(Handler):
     ''' Handler for queued tasks to process uploaded import files '''
+
+    use_csrf = False
 
     def post(self):
         ''' worker for the queued task '''
 
         #load the chunked data
         xml = ''
-        job = self.request.get('job')
-        #keys = self.request.get('keys')
-        #raise Exception('keys: ' + keys)
+        jobid = self.request.get('job')
 
-        job = Import().get_by_id()
-        chunks = FileChunk().all().parent(job).order('order')
+        job = Import().get_by_id(int(jobid))
+        chunks = FileChunk().all().ancestor(job).order('order').fetch(100)
         for chunk in chunks:
             xml += chunk.data
-
-        #for key in keys.split(','):
-        #    f = ImportChunk.get_by_id(int(key))
-        #    if f is None:
-        #        return
-        #    xml += f.data
-        #    f.delete()
 
         #pick the right importer class
         if job.source == 'wordpress':
             importer = wordpress.Import(job)
         else:
+            self.abort(401)
             return
 
         #import the data
         importer.process(xml)
+        for chunk in chunks:
+            chunk.delete()
         job.delete()
         return
 

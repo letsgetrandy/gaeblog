@@ -117,7 +117,7 @@ class Attachment(db.Model):
 
 class ImageVariant(db.Model):
     attachment = db.IntegerProperty()
-    name = db.StringProperty()
+    #name = db.StringProperty()
     width = db.IntegerProperty()
     height = db.IntegerProperty()
     filename = db.StringProperty()
@@ -151,8 +151,13 @@ class Post(db.Model):
     excerpt = db.StringProperty(default=None)
     categories = db.StringListProperty()
     tags = db.StringListProperty()
-    featured_img = db.ReferenceProperty(Attachment)
+    featured_img = db.StringProperty()
     legacy_permalink = db.StringProperty()
+
+    @property
+    def attachment_set(self):
+        return Attachment().all().ancestor(self).fetch(50)
+        #img = Attachment().get_by_key_name(self.featured_img, parent=self)
 
     def categories_set(self):
         ''' returns a set of categories associated with this post '''
@@ -198,25 +203,25 @@ class Post(db.Model):
         else:
             return Post.slugify(self.title)
 
-    def status(self):
-        ''' returns a text representation of teh post's status '''
-        if self.published_date is not None:
-            if self.published_date < datetime.datetime.now:
-                return 'Published'
-            else:
-                return 'Scheduled'
-        else:
-            return 'Draft'
+    #def status(self):
+    #    ''' returns a text representation of the post's status '''
+    #    if self.published_date is not None:
+    #        if self.published_date < datetime.datetime.now:
+    #            return 'Published'
+    #        else:
+    #            return 'Scheduled'
+    #    else:
+    #        return 'Draft'
 
     def get_image(self, variant_name):
         ''' get an image variant by name '''
-        variants = self.featured_img.imagevariant_set.all()
-        if len(variants) == 0:
+        if not self.featured_img:
             return None
-        try:
-            return variants.get(name=variant_name)
-        except:
+        img = Attachment().get_by_key_name(self.featured_img, parent=self)
+        if not img:
             return None
+        variant = ImageVariant().get_by_key_name(variant_name, parent=img)
+        return variant
 
     @property
     def get_feature_image(self):
@@ -225,6 +230,12 @@ class Post(db.Model):
     @property
     def get_thumbnail(self):
         return self.get_image('thumbnail')
+
+    @property
+    def get_fullsize_image(self):
+        if not self.featured_img:
+            return None
+        return Attachment().get_by_key_name(self.featured_img, parent=self)
 
     def related_posts(self):
         ''' returns a list containing related posts '''
