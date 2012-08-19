@@ -6,10 +6,64 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 from operator import itemgetter
 from handlers import AdminHandler, Handler, Handle404
 from pagedquery import PagedQuery
+from common import make_image_thumbnail, make_reduced_image, get_image_dimensions
 import webapp2
 import models
 import datetime
-import wordpress
+import os
+import settings
+import S3
+
+
+class Import(db.Model):
+    ''' Represents a single import job '''
+    source = db.StringProperty()  # eg, "wordpress"
+    created = db.DateTimeProperty(auto_now_add=True)
+    link_path = db.StringProperty()
+    img_path = db.StringProperty()
+    orig_url = db.StringProperty()
+
+
+class Image:
+    ''' Class for persisting Image data when creating a post '''
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1:
+            arr = args[0].split(',')
+            self.name = arr[0]
+            self.variants = [ImageVariant(s) for s in arr[1:]]
+        else:
+            self.name = kwargs.get('name')
+            self.variants = kwargs.get('variants', [])
+
+    def __str__(self):
+        return '%s,%s' % (self.name, ','.join([str(v) for v in self.variants]))
+
+    def __repr__(self):
+        return '<Image: %s>' % self.name
+
+
+class ImageVariant:
+    ''' Class for persisting Image variations '''
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1:
+            p, n, w, h = args[0].split('#')
+            self.path = p
+            self.name = n
+            self.width = w
+            self.height = h
+        else:
+            self.path = kwargs.get('path')
+            self.name = kwargs.get('name')
+            self.width = kwargs.get('width')
+            self.height = kwargs.get('height')
+
+    def __str__(self):
+        return "%s#%s#%s#%s" % (self.path, self.name,
+                self.width or '', self.height or '')
+
+    def __repr__(self):
+        return "ImageVariant(path='%s', name='%s', width=%s, height=%s)" % (
+                self.path, self.name, self.width, self.height)
 
 
 class IndexHandler(AdminHandler):
@@ -123,8 +177,7 @@ class PostHandler(AdminHandler):
         post.title = title
         post.body = data.get('body')
         post.excerpt = data.get('excerpt')
-        #if excerpt:
-        #    post.excerpt = excerpt
+        post.featured_img = data.get('featured_img')
 
         formatstr = '%Y-%m-%d %H:%M:%S'
 
@@ -150,6 +203,23 @@ class PostHandler(AdminHandler):
 
         post.save()
         post.update_related_posts()
+
+        images = data.getall('image')
+        if images:
+            for im in images:
+                image = Image(im)
+                att = models.Attachment(parent=post, key_name=image.name)
+                att.filename = image.name
+                att.put()
+                for var in image.variants:
+                    v = models.ImageVariant(parent=att, key_name=var.name)
+                    v.filename = var.path
+                    if var.width:
+                        v.width = int(var.width)
+                    if var.height:
+                        v.height = int(var.height)
+                    v.put()
+            pass
 
         return self.redirect('/admin/posts/edit/%s/?updated=true' %
                 post.key().name())
@@ -264,13 +334,78 @@ class CategoryHandler(AdminHandler):
         return self.render('admin_category_form.html')
 
 
-class Import(db.Model):
-    ''' Represents a single import job '''
-    source = db.StringProperty()  # eg, "wordpress"
-    created = db.DateTimeProperty(auto_now_add=True)
-    link_path = db.StringProperty()
-    img_path = db.StringProperty()
-    orig_url = db.StringProperty()
+class ImageLoader(AdminHandler):
+    '''  '''
+
+    def get(self):
+        key = self.request.GET.get('key')
+        if key:
+            post = models.Post().get_by_key_name(key)
+            atts = models.Attachment().all().ancestor(post).fetch(100)
+            attach = []
+            for att in atts:
+                i = Image(name=att.filename)
+                vrnts = models.ImageVariant().all().ancestor(att).fetch(10)
+                for vrnt in vrnts:
+                    v = ImageVariant(name=vrnt.key().name(), path=vrnt.filename,
+                            width=vrnt.width, height=vrnt.height)
+                    i.variants.append(v)
+                attach.append(i)
+        else:
+            attach = []
+        return self.render('admin_image_upload.html', {'images': attach})
+
+    def post(self):
+        ff = self.request.get('img')
+        if not ff:
+            return
+        f = self.request.POST.get('img')
+        basename, extension = os.path.splitext(f.filename)
+        files = self.request.POST.getall('files')
+        files.append(f.filename)
+
+        images = self.request.POST.getall('image')
+
+        conn = S3.Connection(
+                settings.AWS_ACCESS_KEY_ID, settings.AWS_SECRET_ACCESS_KEY)
+        #generator = S3.QueryStringAuthGenerator(
+        #        settings.AWS_ACCESS_KEY_ID, settings.AWS_SECRET_ACCESS_KEY)
+
+        if conn.check_bucket_exists(settings.S3_BUCKET_NAME).status_code != 200:
+            self.response.out.write('bucket not found')
+            return
+
+        append = 0
+        filename = basename + extension
+        medium = basename + '-medium' + extension
+        thumbnail = basename + '-thumb' + extension
+        code = conn.get(settings.S3_BUCKET_NAME, 'images/%s' % filename).http_response.status_code
+        while code != 404:
+            append -= 1
+            filename = basename + str(append) + extension
+            thumbnail = basename + str(append) + '-thumb' + extension
+            code = conn.get(settings.S3_BUCKET_NAME, 'images/%s' % filename).http_response.status_code
+
+        i = Image(name=f.filename)
+        conn.put(settings.S3_BUCKET_NAME, 'images/' + filename,
+                S3.S3Object(ff),
+                {'x-amz-acl': 'public-read', 'Content-Type': 'image/jpeg'})
+        f_medium = make_reduced_image(ff)
+        size = get_image_dimensions(f_medium)
+        conn.put(settings.S3_BUCKET_NAME, 'images/' + medium,
+                S3.S3Object(f_medium),
+                {'x-amz-acl': 'public-read', 'Content-Type': 'image/jpeg'})
+        i.variants.append(ImageVariant(name="medium", path=medium,
+                width=size[0], height=size[1]))
+        f_thumb = make_image_thumbnail(ff)
+        conn.put(settings.S3_BUCKET_NAME, 'images/' + thumbnail,
+                S3.S3Object(f_thumb),
+                {'x-amz-acl': 'public-read', 'Content-Type': 'image/jpeg'})
+        i.variants.append(ImageVariant(name="thumbnail", path=thumbnail,
+            width=settings.THUMBNAIL_SIZE, height=settings.THUMBNAIL_SIZE))
+        images.append(i)
+
+        return self.render('admin_image_upload.html', {'files': files, 'images': images})
 
 
 class FileChunk(db.Model):
@@ -343,7 +478,8 @@ class ProcessImport(Handler):
 
         #pick the right importer class
         if job.source == 'wordpress':
-            importer = wordpress.Import(job)
+            from wordpress import Import
+            importer = Import(job)
         else:
             self.abort(401)
             return
@@ -359,6 +495,8 @@ class ProcessImport(Handler):
 app = webapp2.WSGIApplication([
 
         (r'/admin/', IndexHandler),
+
+        (r'/admin/image/upload/', ImageLoader),
 
         (r'/admin/posts/', PostsHandler),
         (r'/admin/posts/page/(\d+)/', PostsHandler),

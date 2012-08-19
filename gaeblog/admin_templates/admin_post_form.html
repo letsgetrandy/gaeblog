@@ -29,6 +29,22 @@ label { margin-top:1em; }
 }
 
 /* main body */
+#images {
+    margin:2em 0;
+}
+#image_mgmt {
+    /*background:#eee;*/
+    border:0;
+    background:#fff;
+    height:50px;
+    width:100%;
+}
+#image_names {
+    margin:1em 0 4em 0;
+}
+#image_names a {
+    font-size:.8em;
+}
 #findreplace_button {
     float:right;
     font-size:.8em;
@@ -111,6 +127,7 @@ ul.checklist li {
 {% block body %}
 <form id="post_form" method="post">
 {% csrf_token %}
+<input type="hidden" id="featured_img" name="featured_img" value="{% firstof post.featured_img "" %}">
 <div class="split flip">
     <div class="post_meta">
         <div class="pad">
@@ -137,6 +154,13 @@ ul.checklist li {
                 {% endfor %}
             </ul>
             <input type="text" id="newcategory" placeholder="type to add">
+            <br>
+            <br>
+            <div id="images">
+                <strong>Images</strong>
+                <iframe id="image_mgmt" src="/admin/image/upload/{% if post %}?key={{ post.slug }}{% endif %}"></iframe>
+                <div id="image_names"></div>
+            </div>
             <div id="delete_wrapper" {% if not post.created_date %}style="display:none;"{% endif %}>
                 <a href="#delete" id="delete_button">Delete this post?</a>
             </div>
@@ -208,7 +232,25 @@ var editor = CodeMirror.fromTextArea($("#id_body")[0], {
     mode: 'xml',
     lineNumbers: true,
     lineWrapping: true
-});    
+});
+function set_feature(img) {
+    $("#featured_img").val(img);
+}
+$('#image_mgmt').load(function(event){
+    var files = $('#image_mgmt').contents().find('input[name=image]');
+    var arr = [];
+    for (var i=0; i<files.length; i++) {
+        var s = files[i].value;
+        var fname = s.split(',')[0];
+        arr.push(
+            //'<input type="radio" name="featuredimg" value="' + s + '">' +
+            fname + ' <a href="{{ settings.BLOG_STATIC_BASE }}images/' + fname + '" target="viewfullimg">view</a>' +
+            '<input type="hidden" name="image" value="' + s + '">' +
+            ' <a href="#" onclick="set_feature(\'' + fname + '\');return false;">set main</a> '
+        );
+    }
+    $('#image_names').html(arr.join('<br>'));
+});
 function add_tag(tag) {
     var tagspan = document.createElement('span');
     tagspan.className = 'tag';

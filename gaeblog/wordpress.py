@@ -206,9 +206,10 @@ class Import():
                     item.tags[item.cat_name] = data
                     self.check_tag(item.cat_name, data)
             elif xpath == 'guid':
-                if self.filere:
-                    data = self.filere.sub(r'\1', data)
-                item.url = data
+                if post_type != 'post':
+                    if self.filere:
+                        data = self.filere.sub(r'\1', data)
+                    item.url = data
             elif xpath == 'wp:post_parent':
                 item.parent = data
             elif xpath == 'wp:postmeta/wp:meta_key':

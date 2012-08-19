@@ -114,6 +114,10 @@ class Attachment(db.Model):
             filetype = 'images'
         return '%s%s/%s' % (settings.BLOG_STATIC_BASE, filetype, self.filename)
 
+    @property
+    def variants(self):
+        return ImageVariant().all().ancestor(self).fetch(100)
+
 
 class ImageVariant(db.Model):
     attachment = db.IntegerProperty()
@@ -203,15 +207,10 @@ class Post(db.Model):
         else:
             return Post.slugify(self.title)
 
-    #def status(self):
-    #    ''' returns a text representation of the post's status '''
-    #    if self.published_date is not None:
-    #        if self.published_date < datetime.datetime.now:
-    #            return 'Published'
-    #        else:
-    #            return 'Scheduled'
-    #    else:
-    #        return 'Draft'
+    @property
+    def attachments(self):
+        ''' get the Attachments for this post '''
+        return Attachment().all().ancestor(self).fetch(100)
 
     def get_image(self, variant_name):
         ''' get an image variant by name '''
